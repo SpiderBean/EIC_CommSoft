@@ -1,6 +1,7 @@
 local widget = require "widget"
 local composer = require "composer"
 local sqlite3 = require "sqlite3"
+local sharedMem = require( "sharedMem" )
 
 local sceneHospital = composer.newScene()
 
@@ -165,7 +166,7 @@ tableView = widget.newTableView( {
 
 --tableView:addEventListener("touch",tableView)
 
-for row in db:nrows("SELECT ItemNumber, ItemDescription FROM Templates WHERE TemplateID='HOSPITAL';") do
+for row in db:nrows("SELECT ItemNumber, ItemDescription FROM TemplateEntries WHERE TemplateID='" .. sharedMem.tempType .. "';") do
 
   if not (row.ItemNumber == '') then
 

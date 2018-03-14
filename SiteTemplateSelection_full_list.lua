@@ -2,10 +2,30 @@
 
 local widget = require "widget"
 local composer = require "composer"
+local sqlite3 = require "sqlite3"
+local sharedMem = require( "sharedMem" )
 
 local sceneSelect = composer.newScene()
 
 --display.setStatusBar( display.HiddenStatusBar )
+
+-- Helper function for debugging
+----------------------------------------
+----------------------------------------
+function dump(o)
+   if type(o) == 'table' then
+      local s = '{ '
+      for k,v in pairs(o) do
+         if type(k) ~= 'number' then k = '"'..k..'"' end
+         s = s .. '['..k..'] = ' .. dump(v) .. ','
+      end
+      return s .. '} '
+   else
+      return tostring(o)
+   end
+end
+----------------------------------------
+----------------------------------------
 
 local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
 local db = sqlite3.open(fPath)
@@ -15,13 +35,65 @@ local widget = require( "widget" )
 
 local populateList
 
+local listItems = {}
+
+local function containsPName(table, element)
+  for _, value in pairs(table) do
+    if value.name == element then
+      return true
+    end
+  end
+  return false
+end
+
+--Read in template menu items from the database and store locally in a table
+--On first pass, enter all parent items with empty item lists
+for row in db:nrows("SELECT Name, Parent FROM Templates;") do
+  if (row.Parent == "None") then
+    print("Installing", row.Name, "as a root-level template class")
+    listItems[row.Name] = {
+      name = row.Name,
+      collapsed = true,
+      items = {},
+      level = 0,
+    }
+  end
+end
+--On second pass, add all child items to their respective parent lists
+for row in db:nrows("SELECT Name, Parent FROM Templates;") do
+  local success = false
+  --Start by searching listItems for the parent and attach when found
+  if containsPName(listItems, row.Parent) then
+    print("Adding", row.Name, "as a first-level child of", row.Parent)
+    local Parent = listItems[row.Parent]
+    Parent.items[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 1 }
+    success = true
+  else
+    --If parent isn't found in listItems, check the children list of each item
+    for _, value in pairs(listItems) do
+      if (containsPName(value.items, row.Parent)) then
+        print("Adding", row.Name, "as a second-level child belonging to", row.Parent)
+        local Parent = value.items[row.Parent]
+        Parent.items[row.Name] = { name = row.Name, collapsed = true, level = 2 }
+        success = true
+      end
+    end
+    --If the parent still hasn't been found, insert template as non-child item for failsafe
+    if ((not success) and (not row.Parent == "None")) then
+      print("Invalid parent field", row.Parent, "on template object", row.Name)
+      listItems[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 0 }
+    end
+  end
+end
+
+
 --Items to show in our list
-local listItems = {
-	{ title = "Breakfast", collapsed = true, items = { "Coffee", "Bagel", "Cereal", "Toast" } },
-	{ title = "Lunch", collapsed = true, items = { "Sandwich", "Taco", "Noodles", "Soup", "Fries" } },
-	{ title = "Dinner", collapsed = true, items = { "Pizza", "Burger", "Steak", "Beef", "Lamb" } },
-	{ title = "Desert", collapsed = true, items = { "Apple Pie", "Ice Cream", "Cake", "Chocolate" } },
-}
+--local listItems = {
+--	{ title = "Breakfast", collapsed = true, items = { "Coffee", "Bagel", "Cereal", "Toast" } },
+--	{ title = "Lunch", collapsed = true, items = { "Sandwich", "Taco", "Noodles", "Soup", "Fries" } },
+--	{ title = "Dinner", collapsed = true, items = { "Pizza", "Burger", "Steak", "Beef", "Lamb" } },
+--	{ title = "Desert", collapsed = true, items = { "Apple Pie", "Ice Cream", "Cake", "Chocolate" } },
+--}
 
 -- create a constant for the left spacing of the row content
 local LEFT_PADDING = 10
@@ -78,9 +150,12 @@ local function onCategoryTap(event)
     local row = event.target
     print("tapped Category", row.id)
 
+    print("Row ID:", rowTitles[row.id])
+
+    --Invert the value of the collapse flag
+    listItems[rowTitles[row.id]].collapsed = not listItems[rowTitles[row.id]].collapsed
     for k,v in pairs(rowTitles) do rowTitles[k]=nil end
 
-    listItems[row.id].collapsed = not listItems[row.id].collapsed
     list:deleteAllRows()
     populateList()
 end
@@ -95,19 +170,35 @@ local function onRowRender( event )
 	-- in order to use contentHeight properly, we cache the variable before inserting objects into the group
 
 	local groupContentHeight = row.contentHeight
+  print("Here's the row title:", row.params.title)
+  print("Dumping the rowTitles:", dump(rowTitles))
 
-	local rowTitle = display.newText( row, rowTitles[row.index], 0, 0, nil, 20 )
+  print("row.params.title : ", row.params.title)
+
+  local options = {
+    parent = row,
+    text = row.params.title,
+    x = LEFT_PADDING + 150,
+    y = groupContentHeight * 0.5,
+    fontSize = 20,
+    width = 240,
+    height = 0,
+    align = "left",
+  }
+
+	local rowTitle = display.newText(options)--display.newText( row, row.params.title, 0, 0, nil, 20 )
 
         --print("ORR called")
 
 	-- in Graphics 2.0, the row.x is the center of the row, no longer the top left.
-	rowTitle.x = LEFT_PADDING + 15
-  rowTitle.width = 120--display.contentWidth
+	--rowTitle.x = LEFT_PADDING + 15
+  --rowTitle.width = 240--display.contentWidth
 
 	-- we also set the anchorX of the text to 0, so the object is x-anchored at the left
-	rowTitle.anchorX = 0
+	--rowTitle.anchorX = 0
+  --rowTitle.align = "left"
 
-	rowTitle.y = groupContentHeight * 0.5
+	--rowTitle.y = groupContentHeight * 0.5
 	rowTitle:setFillColor( 0, 0, 0 )
 
   row.width = display.contentWidth
@@ -123,7 +214,7 @@ local function onRowRender( event )
             categoryBtn.id = row.id
 
             local catIndicator = nil
-            if listItems[row.id].collapsed then
+            if listItems[row.params.title].collapsed then
                 catIndicator = display.newImage( row, "rowArrow.png", false )
             else
                 catIndicator = display.newImage( row, "rowArrowDown.png", false )
@@ -150,21 +241,34 @@ local function onRowTouch( event )
 	local phase = event.phase
 	local row = event.target
 
-	if "press" == phase then
+	if phase == "press" then
 		print( "Pressed row: " .. row.index )
 
 	elseif "release" == phase then
 		-- Update the item selected text
-		itemSelected.text = "You selected: " .. rowTitles[row.index]
+		--itemSelected.text = "You selected: " .. rowTitles[row.index]
 
 		--Transition out the list, transition in the item selected text and the back button
 
 		-- The table x origin refers to the center of the table in Graphics 2.0, so we translate with half the object's contentWidth
-		transition.to( list, { x = - list.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
-		transition.to( itemSelected, { x = display.contentCenterX, time = 400, transition = easing.outExpo } )
-		transition.to( backButton, { alpha = 1, time = 400, transition = easing.outQuad } )
+		--transition.to( list, { x = - list.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
+		--transition.to( itemSelected, { x = display.contentCenterX, time = 400, transition = easing.outExpo } )
+		--transition.to( backButton, { alpha = 1, time = 400, transition = easing.outQuad } )
 
 		print( "Tapped and/or Released row: " .. row.index )
+
+    --local options = {
+    --  effect = "crossFade",
+    --  time = 500,
+    --  params = {
+    --    tempType = "HOSPITAL"
+    --  }
+    --}
+    sharedMem.tempType = "ROAD"
+    print("The tempType from perspective of menu is", sharedMem.tempType)
+
+    composer.gotoScene("HospitalTemplate")
+
 	end
 end
 
@@ -213,37 +317,55 @@ backButton.y = display.contentHeight - backButton.contentHeight
 widgetGroup:insert( backButton )
 
 function populateList()
-    for i = 1, #listItems do
+  print("Entered populateList")
+  --If re-writing this function for removal of "name" field, replace below for loop with a key,value iterator
+  local listLength = 0
+  for k, v in pairs(listItems) do
+    listLength = listLength+1
+  end
+  print(listLength)
+
+  for k, v in pairs(listItems) do
+    print("Entered for loop")
 	--Add the rows category title
-	rowTitles[ #rowTitles + 1 ] = listItems[i].title
+	  rowTitles[ #rowTitles + 1 ] = k
 
-	--Insert the category
-	list:insertRow{
-                id = i,
-		rowHeight = 70,
-		rowColor =
-		{
-			default = { 150/255, 160/255, 180/255, 200/255 },
-		},
-		isCategory = true,
-	}
-        print(listItems[i].collapsed )
-        if not listItems[i].collapsed then
-            --Insert the item
-            for j = 1, #listItems[i].items do
-                    --Add the rows item title
-                    rowTitles[ #rowTitles + 1 ] = listItems[i].items[j]
+    print("We're executing in here")
 
-                    --Insert the item
-                    list:insertRow{
-                            rowHeight = 40,
-                            isCategory = false,
-                            listener = onRowTouch
-                    }
-            end
-        end
+    --Insert the category
+    list:insertRow{
+      isCategory = true,
+    	rowHeight = 70,
+    	rowColor = {
+    		default = { 150/255, 160/255, 180/255, 200/255 },
+    	},
+      params = {
+        title = k,
+        level = v.level
+      },
+    }
+
+    print(listItems[k].collapsed )
+    if not listItems[k].collapsed then
+      --Insert the item
+      for n, m in pairs(listItems[k].items) do
+              --Add the rows item title
+              rowTitles[ #rowTitles + 1 ] = listItems[k].items[n]
+
+              --Insert the item
+              list:insertRow{
+                      rowHeight = 40,
+                      isCategory = false,
+                      listener = onRowTouch,
+                      params = {
+                        title = n,
+                        level = m.level
+                      },
+              }
+      end
     end
 
+  end
 end
 
 populateList()
