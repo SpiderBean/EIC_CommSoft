@@ -3,7 +3,7 @@
 local widget = require "widget"
 local composer = require "composer"
 local sqlite3 = require "sqlite3"
-local sharedMem = require( "sharedMem" )
+local sharedMem = require "sharedMem"
 
 local sceneSelect = composer.newScene()
 
@@ -29,9 +29,6 @@ end
 
 local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
 local db = sqlite3.open(fPath)
-
---import the widget library
-local widget = require( "widget" )
 
 local populateList
 
@@ -170,8 +167,8 @@ local function onRowRender( event )
 	-- in order to use contentHeight properly, we cache the variable before inserting objects into the group
 
 	local groupContentHeight = row.contentHeight
-  print("Here's the row title:", row.params.title)
-  print("Dumping the rowTitles:", dump(rowTitles))
+  --print("Here's the row title:", row.params.title)
+  --print("Dumping the rowTitles:", dump(rowTitles))
 
   print("row.params.title : ", row.params.title)
 
@@ -242,7 +239,8 @@ local function onRowTouch( event )
 	local row = event.target
 
 	if phase == "press" then
-		print( "Pressed row: " .. row.index )
+		print( "Pressed row: " .. row.id )
+    print(rowTitles[row.id].name)
 
 	elseif "release" == phase then
 		-- Update the item selected text
@@ -255,7 +253,7 @@ local function onRowTouch( event )
 		--transition.to( itemSelected, { x = display.contentCenterX, time = 400, transition = easing.outExpo } )
 		--transition.to( backButton, { alpha = 1, time = 400, transition = easing.outQuad } )
 
-		print( "Tapped and/or Released row: " .. row.index )
+		print( "Tapped and/or Released row: " .. row.id )
 
     --local options = {
     --  effect = "crossFade",
@@ -264,10 +262,25 @@ local function onRowTouch( event )
     --    tempType = "HOSPITAL"
     --  }
     --}
-    sharedMem.tempType = "ROAD"
-    print("The tempType from perspective of menu is", sharedMem.tempType)
 
-    composer.gotoScene("HospitalTemplate")
+    --Set the shared data variables to be used in the datbase query when
+    --populating the template in the next scene
+    sharedMem.tempID = rowTitles[row.id].name
+    sharedMem.tempType = 'Document'
+
+    print("The tempId is", sharedMem.tempID, "and the newProject flag is", sharedMem.newProject)
+
+    --Update the database with the type of the newly created project
+    if (sharedMem.newProject) then
+      local err = db:exec(
+        [[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]]
+      )
+      sharedMem.newProject = false
+      --print([[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]])
+      --print("the result of the update query was", err)
+    end
+
+    composer.gotoScene("RenderTemplate")
 
 	end
 end
@@ -278,7 +291,8 @@ list = widget.newTableView
 	top = titleBar.height,
 	width = display.contentWidth,
 	height = display.actualContentHeight,
-  --x = 0,
+  --**If using the below 'left' setting, change row width to actualContentWidth**--
+  --left = -(display.actualContentWidth - display.contentWidth)/2,
   --y = 0,
 	--maskFile = "mask-320x448.png",
 	onRowRender = onRowRender,

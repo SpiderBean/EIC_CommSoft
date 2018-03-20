@@ -4,10 +4,10 @@ local widget = require "widget"
 local composer = require "composer"
 
 -- Create handle for the scene content
-local scene = composer.newScene()
+local retrieveOrCreate = composer.newScene()
 
 -- Define the scene create function which fully defines the screen
-function scene:create( event )
+function retrieveOrCreate:create( event )
 	local sceneGroup = self.view
 
 	-- Calculate offsets for positioning the buttons
@@ -22,50 +22,50 @@ function scene:create( event )
 	sceneGroup:insert(buttonRect2)
 
 	-- Initialise the buttons
-	local siteButton = widget.newButton( {
-		label="Enter Data for a Single Project",
+	local retrieveButton = widget.newButton( {
+		label="Retrieve Existing Project from Database",
 		width=buttonRect1.width,
 		height=buttonRect1.height,
 		shape = "buttonRect1"
 	} )
 
-	local collationTemplateButton = widget.newButton( {
-		label="Create a Multi-Project Summary Report",
+	local createButton = widget.newButton( {
+		label="Create New Project",
 		width=buttonRect2.width,
 		height=buttonRect2.height,
 		shape = "buttonRect2"
 	} )
 
-	sceneGroup:insert( siteButton )
-	sceneGroup:insert( collationTemplateButton )
+	sceneGroup:insert( retrieveButton )
+	sceneGroup:insert( createButton )
 
 	-- Position the buttons on screen
-	siteButton.x = display.contentCenterX
-	siteButton.y = oneThirdDown
+	retrieveButton.x = display.contentCenterX
+	retrieveButton.y = oneThirdDown
 
-	collationTemplateButton.x = display.contentCenterX
-	collationTemplateButton.y = twoThirdDown
+	createButton.x = display.contentCenterX
+	createButton.y = twoThirdDown
 
 
 	-- Initialise event listeners for template buttons:
-	local function onSiteTemplate()
-		composer.gotoScene( "RetrieveOrCreate" ) --SiteTemplateSelection_full_list
+	local function onRetrieve()
+		composer.gotoScene( "ExistingProjects" )
 	end
 
-	local function onCollationTemplate()
-		composer.gotoScene( "StartReportCollation" )
+	local function onCreate()
+		composer.gotoScene( "CreateProject" )
 	end
 
 	-- Connect event listeners to buttons
-	siteButton:addEventListener("touch",onSiteTemplate)
-	collationTemplateButton:addEventListener("touch",onCollationTemplate)
+	retrieveButton:addEventListener("touch",onRetrieve)
+	createButton:addEventListener("touch",onCreate)
 
 end
 
 -- Pass the scene content to an event listener
-scene:addEventListener("create",scene)
+retrieveOrCreate:addEventListener("create",retrieveOrCreate)
 
 --Runtime:addEventListener("orientation",positionVis())
 
 
-return scene
+return retrieveOrCreate
