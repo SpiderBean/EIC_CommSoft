@@ -7,384 +7,310 @@ local sharedMem = require "sharedMem"
 
 local sceneSelect = composer.newScene()
 
---display.setStatusBar( display.HiddenStatusBar )
+function sceneSelect:create( event )
+  local sceneGroup = self.view
 
--- Helper function for debugging
-----------------------------------------
-----------------------------------------
-function dump(o)
-   if type(o) == 'table' then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
+  local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
+  local db = sqlite3.open(fPath)
+
+  local populateList
+
+  local listItems = {}
+
+  local function containsPName(table, element)
+    for _, value in pairs(table) do
+      if value.name == element then
+        return true
       end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
-end
-----------------------------------------
-----------------------------------------
+    end
+    return false
+  end
 
-local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
-local db = sqlite3.open(fPath)
-
-local populateList
-
-local listItems = {}
-
-local function containsPName(table, element)
-  for _, value in pairs(table) do
-    if value.name == element then
-      return true
+  --Read in template menu items from the database and store locally in a table
+  --On first pass, enter all parent items with empty item lists
+  for row in db:nrows("SELECT Name, Parent FROM Templates;") do
+    if (row.Parent == "None") then
+      print("Installing", row.Name, "as a root-level template class")
+      listItems[row.Name] = {
+        name = row.Name,
+        collapsed = true,
+        items = {},
+        level = 0,
+      }
     end
   end
-  return false
-end
+  --On second pass, add all child items to their respective parent lists
+  for row in db:nrows("SELECT Name, Parent FROM Templates;") do
+    local success = false
+    --Start by searching listItems for the parent and attach when found
+    if containsPName(listItems, row.Parent) then
+      print("Adding", row.Name, "as a first-level child of", row.Parent)
+      local Parent = listItems[row.Parent]
+      Parent.items[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 1 }
+      success = true
+    else
+      --If parent isn't found in listItems, check the children list of each item
+      for _, value in pairs(listItems) do
+        if (containsPName(value.items, row.Parent)) then
+          print("Adding", row.Name, "as a second-level child belonging to", row.Parent)
+          local Parent = value.items[row.Parent]
+          Parent.items[row.Name] = { name = row.Name, collapsed = true, level = 2 }
+          success = true
+        end
+      end
+      --If the parent still hasn't been found, insert template as non-child item for failsafe
+      if ((not success) and (not row.Parent == "None")) then
+        print("Invalid parent field", row.Parent, "on template object", row.Name)
+        listItems[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 0 }
+      end
+    end
+  end
 
---Read in template menu items from the database and store locally in a table
---On first pass, enter all parent items with empty item lists
-for row in db:nrows("SELECT Name, Parent FROM Templates;") do
-  if (row.Parent == "None") then
-    print("Installing", row.Name, "as a root-level template class")
-    listItems[row.Name] = {
-      name = row.Name,
-      collapsed = true,
-      items = {},
-      level = 0,
+
+  -- create a constant for the left spacing of the row content
+  local LEFT_PADDING = 10
+
+  --Set the background to white
+  display.setDefault( "background", 0.5, 0.13, 0.7 )
+
+  --Create a group to hold our widgets & images
+  local widgetGroup = display.newGroup()
+
+  -- Create toolbar to go at the top of the screen
+  local titleBar = display.newRect(display.contentCenterX, 0, display.actualContentWidth, 60)
+
+  titleBar.y = display.screenOriginY + titleBar.contentHeight * 0.5
+
+  local titleText = display.newText{
+    text = "Project Templates",
+    x = display.contentCenterX,
+    y = titleBar.y + titleBar.y*0.2,
+    height = titleBar.height,
+    font = native.systemFontBold,
+    fontSize = 25
+  }
+  titleText:setFillColor( 0 )
+
+
+  -- Forward reference for our back button & tableview
+  local backButton, list
+  local rowTitles = {}
+
+  local function onCategoryTap(event)
+      local row = event.target
+      print("tapped Category", row.id)
+
+      print("Row ID:", rowTitles[row.id])
+
+      --Invert the value of the collapse flag
+      listItems[rowTitles[row.id]].collapsed = not listItems[rowTitles[row.id]].collapsed
+      for k,v in pairs(rowTitles) do rowTitles[k]=nil end
+
+      list:deleteAllRows()
+      populateList()
+  end
+
+  -- Handle row rendering
+  local function onRowRender( event )
+  	local phase = event.phase
+  	local row = event.row
+  	local isCategory = row.isCategory
+
+  	-- in graphics 2.0, the group contentWidth / contentHeight are initially 0, and expand once elements are inserted into the group.
+  	-- in order to use contentHeight properly, we cache the variable before inserting objects into the group
+
+  	local groupContentHeight = row.contentHeight
+
+    print("row.params.title : ", row.params.title)
+
+    local options = {
+      parent = row,
+      text = row.params.title,
+      x = LEFT_PADDING + 150,
+      y = groupContentHeight * 0.5,
+      fontSize = 20,
+      width = 240,
+      height = 0,
+      align = "left",
     }
+
+  	local rowTitle = display.newText(options)
+
+  	rowTitle:setFillColor( 0, 0, 0 )
+
+    row.width = display.contentWidth
+    row.x = 0
+
+  	if isCategory then
+
+              local categoryBtn = display.newRect( row, 0, 0, row.width, row.height )
+              categoryBtn.anchorX, categoryBtn.anchorY = 0, 0
+              categoryBtn:addEventListener ( "tap", onCategoryTap )
+              categoryBtn.alpha = 0
+              categoryBtn.isHitTestable = true
+              categoryBtn.id = row.id
+
+              local catIndicator = nil
+              if listItems[row.params.title].collapsed then
+                  catIndicator = display.newImage( row, "rowArrow.png", false )
+              else
+                  catIndicator = display.newImage( row, "rowArrowDown.png", false )
+              end
+              catIndicator.x = LEFT_PADDING
+              catIndicator.anchorX = 0
+              catIndicator.y = groupContentHeight * 0.5
+
+          else
+  		local rowArrow = display.newImage( row, "rowArrow.png", false )
+
+                  rowArrow.x = row.contentWidth - LEFT_PADDING
+
+  		-- we set the image anchorX to 1, so the object is x-anchored at the right
+  		rowArrow.anchorX = 1
+
+  		-- we set the image anchorX to 1, so the object is x-anchored at the right
+  		rowArrow.y = groupContentHeight * 0.5
+  	end
   end
-end
---On second pass, add all child items to their respective parent lists
-for row in db:nrows("SELECT Name, Parent FROM Templates;") do
-  local success = false
-  --Start by searching listItems for the parent and attach when found
-  if containsPName(listItems, row.Parent) then
-    print("Adding", row.Name, "as a first-level child of", row.Parent)
-    local Parent = listItems[row.Parent]
-    Parent.items[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 1 }
-    success = true
-  else
-    --If parent isn't found in listItems, check the children list of each item
-    for _, value in pairs(listItems) do
-      if (containsPName(value.items, row.Parent)) then
-        print("Adding", row.Name, "as a second-level child belonging to", row.Parent)
-        local Parent = value.items[row.Parent]
-        Parent.items[row.Name] = { name = row.Name, collapsed = true, level = 2 }
-        success = true
+
+  -- Handle row touch events
+  local function onRowTouch( event )
+  	local phase = event.phase
+  	local row = event.target
+
+  	if phase == "press" then
+  		print( "Pressed row: " .. row.id )
+      print(rowTitles[row.id].name)
+
+  	elseif "release" == phase then
+  		-- Update the item selected text
+  		--itemSelected.text = "You selected: " .. rowTitles[row.index]
+
+  		--Transition out the list, transition in the item selected text and the back button
+
+  		-- The table x origin refers to the center of the table in Graphics 2.0, so we translate with half the object's contentWidth
+  		--transition.to( list, { x = - list.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
+  		--transition.to( itemSelected, { x = display.contentCenterX, time = 400, transition = easing.outExpo } )
+  		--transition.to( backButton, { alpha = 1, time = 400, transition = easing.outQuad } )
+
+  		print( "Tapped and/or Released row: " .. row.id )
+
+      --Set the shared data variables to be used in the datbase query when
+      --populating the template in the next scene
+      sharedMem.tempID = rowTitles[row.id].name
+      sharedMem.tempType = 'Document'
+
+      print("The tempId is", sharedMem.tempID, "and the newProject flag is", sharedMem.newProject)
+
+      --Update the database with the type of the newly created project
+      if (sharedMem.newProject) then
+        local err = db:exec(
+          [[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]]
+        )
       end
-    end
-    --If the parent still hasn't been found, insert template as non-child item for failsafe
-    if ((not success) and (not row.Parent == "None")) then
-      print("Invalid parent field", row.Parent, "on template object", row.Name)
-      listItems[row.Name] = { name = row.Name, collapsed = true, items = {}, level = 0 }
-    end
+
+      composer.gotoScene("RenderTemplate")
+
+  	end
   end
-end
 
-
---Items to show in our list
---local listItems = {
---	{ title = "Breakfast", collapsed = true, items = { "Coffee", "Bagel", "Cereal", "Toast" } },
---	{ title = "Lunch", collapsed = true, items = { "Sandwich", "Taco", "Noodles", "Soup", "Fries" } },
---	{ title = "Dinner", collapsed = true, items = { "Pizza", "Burger", "Steak", "Beef", "Lamb" } },
---	{ title = "Desert", collapsed = true, items = { "Apple Pie", "Ice Cream", "Cake", "Chocolate" } },
---}
-
--- create a constant for the left spacing of the row content
-local LEFT_PADDING = 10
-
---Set the background to white
-display.setDefault( "background", 0.5, 0.13, 0.7 )
-
---Create a group to hold our widgets & images
-local widgetGroup = display.newGroup()
-
--- The gradient used by the title bar
---local titleGradient = {
---	type = 'gradient',
---	color1 = { 189/255, 203/255, 220/255, 255/255 },
---	color2 = { 89/255, 116/255, 152/255, 255/255 },
---	direction = "down"
---}
-
--- Create toolbar to go at the top of the screen
-local titleBar = display.newRect(display.contentCenterX, 0, display.actualContentWidth, 60)
-
-titleBar.y = display.screenOriginY + titleBar.contentHeight * 0.5
-
-local titleText = display.newText{
-  text = "Project Templates",
-  x = display.contentCenterX,
-  y = titleBar.y + titleBar.y*0.2,
-  height = titleBar.height,
-  font = native.systemFontBold,
-  fontSize = 25
-}
-titleText:setFillColor( 0 )
-
--- create a shadow underneath the titlebar (for a nice touch)
---------------------------------------------------------------
---local shadow = display.newImage( "shadow.png" )
---shadow.anchorX = 0; shadow.anchorY = 0		-- TopLeft anchor
---shadow.x, shadow.y = 0, titleBar.y + titleBar.contentHeight * 0.5
---shadow.xScale = 320 / shadow.contentWidth
---shadow.alpha = 0.45
-
---Text to show which item we selected
---local itemSelected = display.newText( "You selected", 0, 0, native.systemFontBold, 24 )
---itemSelected:setFillColor( 0 )
---itemSelected.x = display.contentWidth * 0.5
---itemSelected.y = display.contentCenterY
---widgetGroup:insert( itemSelected )
-
--- Forward reference for our back button & tableview
-local backButton, list
-local rowTitles = {}
-
-local function onCategoryTap(event)
-    local row = event.target
-    print("tapped Category", row.id)
-
-    print("Row ID:", rowTitles[row.id])
-
-    --Invert the value of the collapse flag
-    listItems[rowTitles[row.id]].collapsed = not listItems[rowTitles[row.id]].collapsed
-    for k,v in pairs(rowTitles) do rowTitles[k]=nil end
-
-    list:deleteAllRows()
-    populateList()
-end
-
--- Handle row rendering
-local function onRowRender( event )
-	local phase = event.phase
-	local row = event.row
-	local isCategory = row.isCategory
-
-	-- in graphics 2.0, the group contentWidth / contentHeight are initially 0, and expand once elements are inserted into the group.
-	-- in order to use contentHeight properly, we cache the variable before inserting objects into the group
-
-	local groupContentHeight = row.contentHeight
-  --print("Here's the row title:", row.params.title)
-  --print("Dumping the rowTitles:", dump(rowTitles))
-
-  print("row.params.title : ", row.params.title)
-
-  local options = {
-    parent = row,
-    text = row.params.title,
-    x = LEFT_PADDING + 150,
-    y = groupContentHeight * 0.5,
-    fontSize = 20,
-    width = 240,
-    height = 0,
-    align = "left",
+  -- Create a tableView
+  list = widget.newTableView
+  {
+  	top = titleBar.height,
+  	width = display.contentWidth,
+  	height = display.actualContentHeight,
+  	onRowRender = onRowRender,
+  	onRowTouch = onRowTouch,
   }
 
-	local rowTitle = display.newText(options)--display.newText( row, row.params.title, 0, 0, nil, 20 )
+  --Insert widgets/images into a group
+  widgetGroup:insert( list )
+  widgetGroup:insert( titleBar )
+  widgetGroup:insert( titleText )
 
-        --print("ORR called")
+  --Handle the back button release event
+  local function onBackRelease()
+  	--Transition in the list, transition out the item selected text and the back button
 
-	-- in Graphics 2.0, the row.x is the center of the row, no longer the top left.
-	--rowTitle.x = LEFT_PADDING + 15
-  --rowTitle.width = 240--display.contentWidth
-
-	-- we also set the anchorX of the text to 0, so the object is x-anchored at the left
-	--rowTitle.anchorX = 0
-  --rowTitle.align = "left"
-
-	--rowTitle.y = groupContentHeight * 0.5
-	rowTitle:setFillColor( 0, 0, 0 )
-
-  row.width = display.contentWidth
-  row.x = 0
-
-	if isCategory then
-
-            local categoryBtn = display.newRect( row, 0, 0, row.width, row.height )
-            categoryBtn.anchorX, categoryBtn.anchorY = 0, 0
-            categoryBtn:addEventListener ( "tap", onCategoryTap )
-            categoryBtn.alpha = 0
-            categoryBtn.isHitTestable = true
-            categoryBtn.id = row.id
-
-            local catIndicator = nil
-            if listItems[row.params.title].collapsed then
-                catIndicator = display.newImage( row, "rowArrow.png", false )
-            else
-                catIndicator = display.newImage( row, "rowArrowDown.png", false )
-            end
-            catIndicator.x = LEFT_PADDING
-            catIndicator.anchorX = 0
-            catIndicator.y = groupContentHeight * 0.5
-
-        else
-		local rowArrow = display.newImage( row, "rowArrow.png", false )
-
-                rowArrow.x = row.contentWidth - LEFT_PADDING
-
-		-- we set the image anchorX to 1, so the object is x-anchored at the right
-		rowArrow.anchorX = 1
-
-		-- we set the image anchorX to 1, so the object is x-anchored at the right
-		rowArrow.y = groupContentHeight * 0.5
-	end
-end
-
--- Handle row touch events
-local function onRowTouch( event )
-	local phase = event.phase
-	local row = event.target
-
-	if phase == "press" then
-		print( "Pressed row: " .. row.id )
-    print(rowTitles[row.id].name)
-
-	elseif "release" == phase then
-		-- Update the item selected text
-		--itemSelected.text = "You selected: " .. rowTitles[row.index]
-
-		--Transition out the list, transition in the item selected text and the back button
-
-		-- The table x origin refers to the center of the table in Graphics 2.0, so we translate with half the object's contentWidth
-		--transition.to( list, { x = - list.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
-		--transition.to( itemSelected, { x = display.contentCenterX, time = 400, transition = easing.outExpo } )
-		--transition.to( backButton, { alpha = 1, time = 400, transition = easing.outQuad } )
-
-		print( "Tapped and/or Released row: " .. row.id )
-
-    --local options = {
-    --  effect = "crossFade",
-    --  time = 500,
-    --  params = {
-    --    tempType = "HOSPITAL"
-    --  }
-    --}
-
-    --Set the shared data variables to be used in the datbase query when
-    --populating the template in the next scene
-    sharedMem.tempID = rowTitles[row.id].name
-    sharedMem.tempType = 'Document'
-
-    print("The tempId is", sharedMem.tempID, "and the newProject flag is", sharedMem.newProject)
-
-    --Update the database with the type of the newly created project
-    if (sharedMem.newProject) then
-      local err = db:exec(
-        [[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]]
-      )
-      sharedMem.newProject = false
-      --print([[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]])
-      --print("the result of the update query was", err)
-    end
-
-    composer.gotoScene("RenderTemplate")
-
-	end
-end
-
--- Create a tableView
-list = widget.newTableView
-{
-	top = titleBar.height,
-	width = display.contentWidth,
-	height = display.actualContentHeight,
-  --**If using the below 'left' setting, change row width to actualContentWidth**--
-  --left = -(display.actualContentWidth - display.contentWidth)/2,
-  --y = 0,
-	--maskFile = "mask-320x448.png",
-	onRowRender = onRowRender,
-	onRowTouch = onRowTouch,
-}
-
---Insert widgets/images into a group
---widgetGroup:insert( list )
-widgetGroup:insert( titleBar )
-widgetGroup:insert( titleText )
---widgetGroup:insert( shadow )
-
-
---Handle the back button release event
-local function onBackRelease()
-	--Transition in the list, transition out the item selected text and the back button
-
-	-- The table x origin refers to the center of the table in Graphics 2.0, so we translate with half the object's contentWidth
-	transition.to( list, { x = 0, time = 400, transition = easing.outExpo } )
-	transition.to( itemSelected, { x = display.contentWidth + itemSelected.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
-	transition.to( backButton, { alpha = 0, time = 400, transition = easing.outQuad } )
-end
-
---Create the back button
-backButton = widget.newButton
-{
-	width = 298,
-	height = 56,
-	label = "Back",
-	labelYOffset = - 1,
-	onRelease = onBackRelease
-}
-backButton.alpha = 0
-backButton.x = display.contentCenterX
-backButton.y = display.contentHeight - backButton.contentHeight
-widgetGroup:insert( backButton )
-
-function populateList()
-  print("Entered populateList")
-  --If re-writing this function for removal of "name" field, replace below for loop with a key,value iterator
-  local listLength = 0
-  for k, v in pairs(listItems) do
-    listLength = listLength+1
+  	-- The table x origin refers to the center of the table in Graphics 2.0, so we translate with half the object's contentWidth
+  	transition.to( list, { x = 0, time = 400, transition = easing.outExpo } )
+  	transition.to( itemSelected, { x = display.contentWidth + itemSelected.contentWidth * 0.5, time = 400, transition = easing.outExpo } )
+  	transition.to( backButton, { alpha = 0, time = 400, transition = easing.outQuad } )
   end
-  print(listLength)
 
-  for k, v in pairs(listItems) do
-    print("Entered for loop")
-	--Add the rows category title
-	  rowTitles[ #rowTitles + 1 ] = k
+  --Create the back button
+  backButton = widget.newButton
+  {
+  	width = 298,
+  	height = 56,
+  	label = "Back",
+  	labelYOffset = - 1,
+  	onRelease = onBackRelease
+  }
+  backButton.alpha = 0
+  backButton.x = display.contentCenterX
+  backButton.y = display.contentHeight - backButton.contentHeight
+  widgetGroup:insert( backButton )
 
-    print("We're executing in here")
+  function populateList()
+    print("Entered populateList")
+    --If re-writing this function for removal of "name" field, replace below for loop with a key,value iterator
+    local listLength = 0
+    for k, v in pairs(listItems) do
+      listLength = listLength+1
+    end
+    print(listLength)
 
-    --Insert the category
-    list:insertRow{
-      isCategory = true,
-    	rowHeight = 70,
-    	rowColor = {
-    		default = { 150/255, 160/255, 180/255, 200/255 },
-    	},
-      params = {
-        title = k,
-        level = v.level
-      },
-    }
+    for k, v in pairs(listItems) do
+      print("Entered for loop")
+  	--Add the rows category title
+  	  rowTitles[ #rowTitles + 1 ] = k
 
-    print(listItems[k].collapsed )
-    if not listItems[k].collapsed then
-      --Insert the item
-      for n, m in pairs(listItems[k].items) do
-              --Add the rows item title
-              rowTitles[ #rowTitles + 1 ] = listItems[k].items[n]
+      print("We're executing in here")
 
-              --Insert the item
-              list:insertRow{
-                      rowHeight = 40,
-                      isCategory = false,
-                      listener = onRowTouch,
-                      params = {
-                        title = n,
-                        level = m.level
-                      },
-              }
+      --Insert the category
+      list:insertRow{
+        isCategory = true,
+      	rowHeight = 70,
+      	rowColor = {
+      		default = { 150/255, 160/255, 180/255, 200/255 },
+      	},
+        params = {
+          title = k,
+          level = v.level
+        },
+      }
+
+      print(listItems[k].collapsed )
+      if not listItems[k].collapsed then
+        --Insert the item
+        for n, m in pairs(listItems[k].items) do
+                --Add the rows item title
+                rowTitles[ #rowTitles + 1 ] = listItems[k].items[n]
+
+                --Insert the item
+                list:insertRow{
+                        rowHeight = 40,
+                        isCategory = false,
+                        listener = onRowTouch,
+                        params = {
+                          title = n,
+                          level = m.level
+                        },
+                }
+        end
       end
-    end
 
+    end
   end
+
+  populateList()
+
+  sceneGroup:insert(widgetGroup)
 end
 
-populateList()
 
---]]
 
 -- Pass the scene content to an event listener
 sceneSelect:addEventListener("create",sceneSelect)

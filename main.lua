@@ -33,6 +33,7 @@ local db = sqlite3.open(fPath)
 
 --Initialise default flags in shared memory
 sharedMem.loadProject = false
+sharedMem.projID = 'NA'
 
 function onSystemEvent( event )
   if(event.type == "applicationExit") then
