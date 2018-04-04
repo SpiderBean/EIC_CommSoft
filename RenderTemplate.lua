@@ -1,7 +1,8 @@
 local widget = require "widget"
 local composer = require "composer"
 local sqlite3 = require "sqlite3"
-local sharedMem = require( "sharedMem" )
+local sharedMem = require "sharedMem"
+local utility = require "utility"
 
 local renderTemplate = composer.newScene()
 
@@ -54,7 +55,6 @@ function renderTemplate:create( event )
     elseif (ProgressTable[index][sharedMem.outputDate] == 2) then
       object:setFillColor(255/256,189/256,0/256)
     else
-      print("We're calling green")
       object:setFillColor(0,1,0)
     end
   end
@@ -114,6 +114,7 @@ function renderTemplate:create( event )
     --print("The img reference for the heading is", headingImgTable[topLevel], "and topLevel is", topLevel)
     --Finally, update the colour of the heading image
     setStatusColour(topLevel,headingImgTable[topLevel])
+    --GUI_Response.setStatusColour(ProgressTable,topLevel,sharedMem.outputDate,headingImgTable[topLevel])
   end
   -------------------------------------------------------------------------
   --------------------End of General Functions-----------------------------
@@ -159,12 +160,18 @@ function renderTemplate:create( event )
       } )
     rowDescription:setFillColor( 0 )
 
-    local statusLight = {
+    local statusRLight = {
       x = display.contentWidth - display.contentWidth/8,
       y = rowHeight * 0.5
     }
 
-    row.status = display.newCircle( statusLight.x, statusLight.y, 20 )
+    --row.status = display.newCircle( statusLight.x, statusLight.y, 20 )
+    --row.status
+    row.status = display.newImage(row,'white_circle.png')
+    row.status.x = display.contentWidth - display.contentWidth/8
+    row.status.y = rowHeight * 0.5
+    row.status.height = 40
+    row.status.width = 40
     setStatusColour(row.params.IteNum, row.status)
 
     row:insert( row.status )
@@ -172,10 +179,6 @@ function renderTemplate:create( event )
     --Create a function to modify progress data
     function row:touch( event )
       if (event.phase == "ended") then
-        print("They called me!", sharedMem.outputDate)
-        print("the index being used here is:", row.params.IteNum)
-        print("Dumping the PT", dump(ProgressTable))
-        print("------------", ProgressTable[row.params.IteNum][sharedMem.outputDate])
         ProgressTable[row.params.IteNum][sharedMem.outputDate] = ProgressTable[row.params.IteNum][sharedMem.outputDate] + 1
         if (ProgressTable[row.params.IteNum][sharedMem.outputDate] > 3) then
           ProgressTable[row.params.IteNum][sharedMem.outputDate] = 0
@@ -218,7 +221,7 @@ function renderTemplate:create( event )
   titleBar.y = display.screenOriginY + titleBar.contentHeight * 0.5
 
   local titleText = display.newText{
-    text = sharedMem.projID, -- .. " - " .. sharedMem.tempType,
+    text = sharedMem.projID,
     x = display.contentCenterX,
     y = titleBar.y + titleBar.y*0.2,
     height = titleBar.height,
@@ -246,17 +249,13 @@ function renderTemplate:create( event )
   --Create a function to write the ProgressTable to the database
   function writeProgress()
     print("writeProgress has been called")
+    print("The template type is:", sharedMem.tempType)
     --Populate table with query values
     local args = {}
     args[0] = [["]] .. sharedMem.tempType .. [["]]
     args[1] = [["]] .. sharedMem.tempID .. [["]]
     args[5] = [["]] .. sharedMem.outputDate .. [["]]
-
-    if (sharedMem.loadProject) then
-      args[3] = [["]] .. sharedMem.projID .. [["]]
-    else
-      args[3] = [["]] .. sharedMem.newName .. [["]]
-    end
+    args[3] = [["]] .. sharedMem.projID .. [["]]
 
     --print("The progress table is:\n", dump(ProgressTable))
     for k, v in pairs(ProgressTable) do
@@ -277,27 +276,18 @@ function renderTemplate:create( event )
         AND ItemNumber=" .. args[2] .. ";"
       )
 
-      print (
-        "INSERT OR REPLACE INTO ProjectValues (ProjectID, ItemID, Value, Date)\
-        SELECT " .. args[3] .. ", TemplateEntries.RowID, " .. args[4] .. ", " .. args[5] .. "\
-        FROM TemplateEntries \
-        WHERE TemplateType=" .. args[0] .. " \
-        AND TemplateID=" .. args[1] .. " \
-        AND ItemNumber=" .. args[2] .. ";"
-      )
-
-      print("the result of the save action is:", err)
+      --print("the result of the save action is:", err)
 
     end
   end
 
   --Declare a lookup table to assist with date generation
-  local months = {
+  --[[local months = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-  }
+  }]]
 
   --Function to generate array of months between project start and end dates
-  local function dateToDate( startDate, endDate )
+  --[[local function dateToDate( startDate, endDate )
     local dateArray = {}
 
     local sYear, sMonth, sDay = string.match(startDate, "(%d%d%d%d)%-(%d%d)%-(%d%d)")
@@ -309,15 +299,6 @@ function renderTemplate:create( event )
     eYear = tonumber( eYear )
     eMonth = tonumber( eMonth )
     eDay = tonumber( eDay )
-
-    --[[print("eMonth value here is:", eMonth)
-    print("sMonth value here is:", sMonth)
-
-    print("eYear value here is:", eYear)
-    print("sYear value here is:", sYear)
-
-    print("eDay value here is:", eDay)
-    print("sDay value here is:", sDay)]]
 
     --This loop must still execute once when sYear and eYear are equal
     for i = sYear, eYear, 1 do
@@ -336,14 +317,13 @@ function renderTemplate:create( event )
       print("The loop limits are:", sM, eM )
       for j = sM, eM, 1 do
         year = tostring(i)
-        --dateArray[#dateArray+1] = months[j] .. "-" .. string.match(year,"^%d%d(%d%d)")
         local monthName = months[j] .. "-" .. string.match(year,"^%d%d(%d%d)")
         dateArray[#dateArray+1] = monthName
       end
     end
 
     return dateArray
-  end
+  end]]
 
 
   --Declare database queries for new and existing projects separately
@@ -359,39 +339,22 @@ function renderTemplate:create( event )
                         AND T2.ProjectID='" .. sharedMem.projID .. "'\
                         AND T1.TemplateType='" .. sharedMem.tempType .. "';"
 
-  --Declare a date array for use with projects
-  --Unit length for generic templates; Overwritten for new projects
-  local dateArray = { 1 }
-
-  --Set actionable query depending on create or retrieve request
-  local retrieveTemplate
-  if (sharedMem.loadProject) then
-    retrieveTemplate = existProjQuery
-  else
-    retrieveTemplate = newProjQuery
-  end
 
   print("shared memory value for new project is:", sharedMem.newProject)
   if (sharedMem.loadProject or sharedMem.newProject) then
-    dateArray = dateToDate(sharedMem.newSDate, sharedMem.newEDate)
-    sharedMem.newProject = false
+    sharedMem.dateArray = utility.dateToDate(sharedMem.newSDate, sharedMem.newEDate)
+    sharedMem.outputDate = sharedMem.dateArray[1]
   end
 
   print("The loadProject flag is:", sharedMem.loadProject)
-  print("The selected query is:", retrieveTemplate)
 
   --Iterate through database and generate rows for the table view
   for row in db:nrows( newProjQuery ) do
-    --print("Iterating through database")
 
     if not (row.ItemNumber == '') then
-      --print("The item number for this row is", row.ItemNumber)
 
-      --Create date table within each entry of the progress table
-      --print("This is the dateArray", dump(dateArray))
-      --print("The length of the dateArray is", #dateArray)
       ProgressTable[row.ItemNumber] = {}
-      for k, v in pairs(dateArray) do
+      for k, v in pairs(sharedMem.dateArray) do
         ProgressTable[row.ItemNumber][v] = 0
       end
 
@@ -408,27 +371,14 @@ function renderTemplate:create( event )
     end
   end
 
-  --For project retrieval overwrite ProgressTable 0 values with database values
-  sharedMem.outputDate = dateArray[1]
-  if (sharedMem.loadProject) then
-    --Set the default date for displaying data
-    --In the future this might be set to the closest date to the present or some other smart value
 
-    --print("The date array reads", dump(dateArray))
-    print("The output date is set to", sharedMem.outputDate)
-    for row in db:nrows( existProjQuery ) do
-      --for i = 1, #dateArray, 1 do
-      --print("The item number is:", row.ItemNumber, "The date is:", row.Date, "The value is:", row.Value)
+  print("The output date is set to", sharedMem.outputDate)
+  for row in db:nrows( existProjQuery ) do
 
-      --row.Date = 'Mar-02'
-      ProgressTable[row.ItemNumber][row.Date] = row.Value
-      --print(dump(ProgressTable[row.ItemNumber]))
-      --end
-    end
+    ProgressTable[row.ItemNumber][row.Date] = row.Value
 
-    --Implement conditional reload
-    --tableView:reloadData()
   end
+
 
   tableView:reloadData()
 
@@ -442,7 +392,9 @@ function renderTemplate:create( event )
   } )
 
   local function onSave( event )
+    sharedMem.newProject = false
     if (event.phase == "ended") then
+      print("---Saving the project data")
       writeProgress()
     end
   end
@@ -468,7 +420,7 @@ function renderTemplate:create( event )
     if (event.phase == "ended") then
       composer.gotoScene("StartScreen")
       writeProgress()
-      print("Tried to change scene but you probably didn't see it")
+      sharedMem.newProject = false
     end
   end
 
@@ -510,11 +462,9 @@ function renderTemplate:create( event )
 
   local function onInc( event )
     if (event.phase == "ended") then
-      --**Need to ensure that the dateArray is put in order and accessible via single-digit index**--
-      --This form of incrementation won't work
-      i = table.indexOf(dateArray, sharedMem.outputDate)
-      if (i < #dateArray) then
-        sharedMem.outputDate = dateArray[i+1]
+      i = table.indexOf(sharedMem.dateArray, sharedMem.outputDate)
+      if (i < #sharedMem.dateArray) then
+        sharedMem.outputDate = sharedMem.dateArray[i+1]
         dateDisplay.text = sharedMem.outputDate
         tableView:reloadData()
       end
@@ -523,12 +473,10 @@ function renderTemplate:create( event )
 
   local function onDec( event )
     if (event.phase == "ended") then
-      --**Need to ensure that the dateArray is put in order and accessible via single-digit index**--
-      --This form of incrementation won't work
-      i = table.indexOf(dateArray, sharedMem.outputDate)
+      i = table.indexOf(sharedMem.dateArray, sharedMem.outputDate)
       print("The value of the index is:", i)
       if (i > 1) then
-        sharedMem.outputDate = dateArray[i-1]
+        sharedMem.outputDate = sharedMem.dateArray[i-1]
         dateDisplay.text = sharedMem.outputDate
         tableView:reloadData()
       end
@@ -547,6 +495,8 @@ function renderTemplate:create( event )
 
   -- Function to handle button events
   local function handleTabBarEvent( event )
+    if (event.phase == 'ended') then
+      onSave(event)
       print( event.target.id )  -- Reference to button's 'id' parameter
       if (event.target.id == 'progTab') then
         print("Changing shared memory to Progress")
@@ -562,51 +512,107 @@ function renderTemplate:create( event )
 
       composer.removeScene("RenderTemplate")
       composer.gotoScene("RenderTemplate")
+    end
   end
 
   -- Configure the tab buttons to appear within the bar
-  local tabButtons = {
-      {
-          label = "Progress",
-          id = "progTab",
-          defaultFile = "clock.png",
-          overFile = "clock.png",
-          width = 60,
-          height = 60,
-          --labelYOffset = 8,
-          selected = true,
-          onPress = handleTabBarEvent
-      },
-      {
-          label = "Documents",
-          id = "docTab",
-          defaultFile = "doc.png",
-          overFile = "doc.png",
-          width = 303/5,
-          height = 228/5,
-          onPress = handleTabBarEvent
-      }
+  local tabMargin = (display.actualContentWidth - display.contentWidth)/2
+  local progPageBox = display.newRect(0,0,0,0)
+  progPageBox.width = tabMargin
+  progPageBox.height = display.actualContentHeight/2
+  progPageBox.x = -tabMargin/2
+  progPageBox.y = display.contentHeight/2 - progPageBox.height/2
+  progPageBox:setFillColor(0.9)
+
+  local progPageButton = display.newImage('clock.png')
+  progPageButton.width = 60
+  progPageButton.height = 60
+  progPageButton.x = -display.actualContentWidth*0.04
+  progPageButton.y = progPageBox.y
+  progPageButton.rotation = 90
+
+  local progPageText = display.newText{
+    text = 'Progress',
+    x = progPageBox.x,
+    y = progPageBox.y + progPageButton.height*0.8,
+    width = tabMargin,
+    fontSize = 18,
+    align = 'center'
   }
+  progPageText:setFillColor(0)
 
-  -- Create the widget
-  local tabHeight = (display.actualContentWidth - display.contentWidth)/2
-  local tabBar = widget.newTabBar(
-      {
-          top = display.contentHeight/2 - 52,
-          --*Horizontal*--top = 0,--display.contentHeight-52,
-          left = tabHeight/2-display.actualContentWidth/2+1,
-          --*Horizontal*--left = -(display.actualContentWidth - display.contentWidth)/2 + 1,
-          height = tabHeight,--display.contentHeight,
-          --width = display.contentHeight,--(display.actualContentWidth - display.contentWidth)/2,
-          buttons = tabButtons,
-          rotation = 90,
-      }
-  )
+  local docPageButton = display.newImage('doc.png')
+  docPageButton.width = 303/5
+  docPageButton.height = 228/5
+  docPageButton.x = -display.actualContentWidth*0.04
+  docPageButton.y = display.actualContentHeight*0.72
+  docPageButton.rotation = 90
 
-  sceneGroup:insert(tabBar)
+  local docPageBox = display.newRect(0,0,0,0)
+  docPageBox.width = tabMargin
+  docPageBox.height = display.actualContentHeight/2
+  docPageBox.x = -tabMargin/2
+  docPageBox.y = display.contentHeight/2 + docPageBox.height/2
+  docPageBox:setFillColor(0.9)
 
-  tabBar.rotation = 90
-  --tabBar:setFillColor(0.5)
+  local docPageText = display.newText{
+    text = 'Documents',
+    x = docPageBox.x,
+    y = docPageButton.y + docPageButton.height,
+    width = tabMargin,
+    fontSize = 16,
+    align = 'center'
+  }
+  docPageText:setFillColor(0)
+
+  local function onProgPage( event )
+    if (event.phase == 'ended') then
+      onSave(event)
+      sharedMem.tempType = 'Progress'
+      sharedMem.newProject = false
+      sharedMem.loadProject = false
+      composer.removeScene("RenderTemplate")
+      composer.gotoScene("RenderTemplate")
+    end
+  end
+
+  local function onDocPage( event )
+    if (event.phase == 'ended') then
+      onSave(event)
+      sharedMem.tempType = 'Document'
+      sharedMem.newProject = false
+      sharedMem.loadProject = false
+      composer.removeScene("RenderTemplate")
+      composer.gotoScene("RenderTemplate")
+    end
+  end
+
+  --Provide UI colour feedback for tab selection
+  if (sharedMem.tempType == 'Document') then
+    --Set the tab box colour
+    progPageBox:setFillColor(0.98)
+    docPageBox:setFillColor(0.9)
+    --Set the tab text colour
+    progPageText:setFillColor(0)
+    docPageText:setFillColor(30/255,144/255,255/255)
+  elseif (sharedMem.tempType == 'Progress') then
+    --Set the tab box colour
+    progPageBox:setFillColor(0.9)
+    docPageBox:setFillColor(0.98)
+    --Set the tab text colour
+    progPageText:setFillColor(30/255,144/255,255/255)
+    docPageText:setFillColor(0)
+  end
+
+  docPageButton:addEventListener('touch',onDocPage)
+  progPageButton:addEventListener('touch',onProgPage)
+
+  sceneGroup:insert(progPageBox)
+  sceneGroup:insert(progPageButton)
+  sceneGroup:insert(progPageText)
+  sceneGroup:insert(docPageBox)
+  sceneGroup:insert(docPageButton)
+  sceneGroup:insert(docPageText)
 
 ----------------------------End of Create Scene------------------------
 end

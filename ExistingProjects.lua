@@ -60,11 +60,17 @@ function existingProjects:create( event )
     projName:setFillColor( 0 )
     row:insert(projName)
 
-
+    --Error checking (similar should be implemented on broad scale after transition to MVC structure)
+    local iText
+    if not (row.params.ProjType == nil) then
+      iText = row.params.ProjType
+    else
+      iText = 'Corrupt type data'
+    end
     local projType = display.newText(
       {
         parent = row,
-        text = row.params.ProjType,
+        text = iText,
         x = display.contentWidth*0.45,
         y = rowHeight * 0.5,
         font = nil,

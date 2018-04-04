@@ -1,5 +1,11 @@
 --Useful scraps of code--
 
+
+
+
+
+
+
 --
 local path = system.pathForFile( "test.csv", system.ResourceDirectory )
 local file = io.open( path, "r" )

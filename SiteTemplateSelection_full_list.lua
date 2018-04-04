@@ -205,7 +205,7 @@ function sceneSelect:create( event )
       --Update the database with the type of the newly created project
       if (sharedMem.newProject) then
         local err = db:exec(
-          [[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.newName .. [[";]]
+          [[UPDATE Projects SET Type="]] .. sharedMem.tempID .. [[" WHERE Name="]] .. sharedMem.projID .. [[";]]
         )
       end
 

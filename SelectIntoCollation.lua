@@ -1,10 +1,19 @@
 --This is an overlay scene providing a list of projects to be added to the multiview
 local widget = require "widget"
 local sqlite3 = require "sqlite3"
+local utility = require "utility"
 local composer = require "composer"
 local sharedMem = require "sharedMem"
 
 local selectScene = composer.newScene()
+
+--Create flag to control recognition of clicks on screen
+local goThrough = false
+local start = false
+local move = false
+local over = false
+
+local processItem
 
 -- Helper function for debugging
 ----------------------------------------
@@ -41,7 +50,6 @@ function selectScene:create( event )
 
   sceneGroup:insert(envelopeBox)
 
-  -- Create toolbar to go at the top of the screen
   local titleBar = display.newRect(display.contentCenterX, 0, envelopeBox.width, 60)
   titleBar.y = envelopeBox.height*0.17 -- (0.5*titleBar.height)
   titleBar:setFillColor(0.95)
@@ -59,6 +67,11 @@ function selectScene:create( event )
   sceneGroup:insert(titleBar)
   sceneGroup:insert(titleText)
 
+  local buttonBar = display.newRect(display.contentCenterX, 0, envelopeBox.width-10, 70)
+  buttonBar.y = envelopeBox.height*1.05 -- (0.5*titleBar.height)
+  buttonBar:setFillColor(1)
+
+  sceneGroup:insert(buttonBar)
 
   --Declare the listview infrastructure
   local function onRowRender( event )
@@ -76,7 +89,7 @@ function selectScene:create( event )
         y = rowHeight * 0.5,
         font = nil,
         fontSize = row.params.FSize,
-        width = display.contentWidth*0.3,
+        width = 150,
         anchorX = 0,
         align = "center"
       } )
@@ -128,56 +141,57 @@ function selectScene:create( event )
     endDate:setFillColor( 0 )
     row:insert(endDate)
 
-    local addItem = display.newImage(row, 'green_plus.png')
-    addItem:translate(display.contentWidth*0.65,rowHeight * 0.5)
-    addItem.width = 30
-    addItem.height = 30
+    row.addItem = display.newImage(row, 'green_plus.png')
+    row.addItem:translate(display.contentWidth*0.65,rowHeight * 0.5)
+    row.addItem.width = 30
+    row.addItem.height = 30
 
-    local removeItem = display.newImage(row, 'red_minus.png')
-    removeItem:translate(display.contentWidth*0.65,rowHeight * 0.5)
-    removeItem.width = 30
-    removeItem.height = 30
+    row.removeItem = display.newImage(row, 'red_minus.png')
+    row.removeItem:translate(display.contentWidth*0.65,rowHeight * 0.5)
+    row.removeItem.width = 30
+    row.removeItem.height = 30
 
-
-    local tickItem = display.newImage(row, 'green_tick.png')
-    tickItem:translate(display.contentWidth*0.03,rowHeight * 0.5)
-    tickItem.width = 20
-    tickItem.height = 20
+    row.tickItem = display.newImage(row, 'green_tick.png')
+    row.tickItem:translate(display.contentWidth*0.03,rowHeight * 0.5)
+    row.tickItem.width = 20
+    row.tickItem.height = 20
 
     if (containsKey(sharedMem.PrT, row.params.ProjName)) then
-      removeItem.isVisible = true
-      tickItem.isVisible = true
+      row.removeItem.isVisible = true
+      row.tickItem.isVisible = true
     else
-      removeItem.isVisible = false
-      tickItem.isVisible = false
+      row.removeItem.isVisible = false
+      row.tickItem.isVisible = false
     end
 
     --Create a function to handle touch instructions and load project parameters
     function row:touch( event )
-      if (event.phase == "ended") then
-        --print("The name here is", row.params.ProjName)
-        if not (containsKey(sharedMem.PrT, row.params.ProjName)) then
-          print("Inserting", row.params.ProjName, "into PrT")
-          --table.insert(sharedMem.PrT, row.params.ProjName )
-          sharedMem.PrT[row.params.ProjName] = {
-            StartMonth = row.params.SDate,
-            EndMonth = row.params.EDate,
-            Type = row.params.ProjType,
-            isAdd = false,
-            dataTable = {},
-          }
-          tickItem.isVisible = true
-          removeItem.isVisible = true
-        else
-          print("Removing", row.params.ProjName, "from PrT")
-          sharedMem.PrT[row.params.ProjName] = nil
-          tickItem.isVisible = false
-          removeItem.isVisible = false
-        end
+
+      if (event.phase == "began") then
+        start = true
       end
+      if (event.phase == "moved") then
+        move = true
+      end
+      if (event.phase == "ended") then
+        over = true
+      end
+      if (start and move and over) then
+        start = false
+        move = false
+        over = false
+      elseif (start and over) then
+        --Call the function to add/remove items in PrT
+        processItem(event, row)
+        start = false
+        move = false
+        over = false
+      end
+
+
     end
 
-    addItem:addEventListener("touch",row)
+    row.addItem:addEventListener("touch",row)
 
     row:addEventListener("touch",row)
     list:insert(row)
@@ -188,7 +202,7 @@ function selectScene:create( event )
   {
     top = titleBar.y + titleBar.height*0.5,
     width = envelopeBox.width-10,
-    height = envelopeBox.height - titleBar.height - 5,
+    height = envelopeBox.height - titleBar.height - buttonBar.height,
     onRowRender = onRowRender,
     onRowTouch = onRowTouch,
   }
@@ -215,7 +229,7 @@ function selectScene:create( event )
   -------------------End of list view infrastructure------------
 
   local returnRect = display.newRoundedRect(display.contentCenterX,0,170,50,12)
-  returnRect.y = display.contentHeight*0.8
+  returnRect.y = display.contentHeight*0.84
   returnRect.strokeWidth = 2
   returnRect:setStrokeColor(0)
   --returnRect:setFillColor(0.5)
@@ -228,7 +242,7 @@ function selectScene:create( event )
   } )
 
   returnButton:setFillColor(0)
-  returnButton.y = display.contentHeight*0.805
+  returnButton.y = display.contentHeight*0.845
   returnButton.x = display.contentCenterX
 
   returnRect:addEventListener("touch", onConfigure)
@@ -258,11 +272,68 @@ end
 function containsKey(list, key)
   local result = false
   for k, v in pairs(list) do
-    if (k == key) then
+    if (v.name == key) then
       result = true
     end
   end
   return result
+end
+
+function processItem( event, row )
+  if not (containsKey(sharedMem.PrT, row.params.ProjName)) then
+
+    local PrTlength = 0
+    for k,v in pairs(sharedMem.PrT) do
+      PrTlength = PrTlength + 1
+    end
+
+    print("Inserting", row.params.ProjName, "into PrT with index", PrTlength+1)
+
+    local dArr = utility.dateToDate(row.params.SDate, row.params.EDate)
+    --Scan PrT for a nil location to achieve insertion without overwrite
+    local insertSuccess = false
+    while not (insertSuccess) do
+      if (sharedMem.PrT[PrTlength+1] == nil) then
+        sharedMem.PrT[PrTlength+1] = {
+          name = row.params.ProjName,
+          StartMonth = row.params.SDate,
+          EndMonth = row.params.EDate,
+          Type = row.params.ProjType,
+          isAdd = false,
+          dateArray = dArr,
+          date = dArr[1],
+          dataTable = nil,
+          index = PrTlength + 1, --This should be overwritten by the counting function
+        }
+        row.tickItem.isVisible = true
+        row.removeItem.isVisible = true
+        insertSuccess = true
+      else
+        PrTlength = PrTlength + 1
+      end
+    end
+  else
+    print("Removing", row.params.ProjName, "from PrT")
+    for k, v in pairs(sharedMem.PrT) do
+      if (v.name == row.params.ProjName) then
+        sharedMem.PrT[k] = nil
+      end
+    end
+
+    row.tickItem.isVisible = false
+    row.removeItem.isVisible = false
+  end
+
+  --Calculate index the same way regardless of removal or insertion
+  local indexCount = 1
+  for k, v in pairs(sharedMem.PrT) do
+    if not (v == nil) then
+      print("Assigning", indexCount, "to the list item", v.name)
+      v.index = indexCount
+      indexCount = indexCount + 1
+    end
+  end
+
 end
 
 

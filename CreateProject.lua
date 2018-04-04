@@ -150,32 +150,14 @@ function createProject:create( event )
     if (detailsAvailable) then
       local dbErr
 
-      print(
-        [[INSERT INTO Projects (Name, StartDate, EndDate) \
-        VALUES ("]] .. projNameEntry.text .. [[", \
-        ']] .. startDateEntry.text .. [[', \
-        ']] .. endDateEntry.text .. "');"
-      )
-
-
-  --    [[INSERT INTO Projects (Name, StartDate, EndDate)\
-  --     VALUES ("]] .. projNameEntry.text .. [[", \
-  --     ']] .. startDateEntry.text .. [[', \
-  --     ']] .. endDateEntry.text .. [[');]]
-
-    print(
-      [[INSERT INTO Projects (Name, StartDate, EndDate) VALUES ("]] .. projNameEntry.text .. [[", ']] .. startDateEntry.text .. [[', ']] .. endDateEntry.text .. "');"
-    )
-
-
       dbErr = db:exec(
         [[INSERT INTO Projects (Name, StartDate, EndDate) VALUES ("]] .. projNameEntry.text .. [[", ']] .. startDateEntry.text .. [[', ']] .. endDateEntry.text .. "');"
      )
 
-      print("The insertion operation resulted in", dbErr)
+      if (dbErr) then print("The insertion operation resulted in", dbErr) end
 
       sharedMem.newProject = true
-      sharedMem.newName = projNameEntry.text
+      sharedMem.projID = projNameEntry.text
       sharedMem.newSDate = startDateEntry.text
       sharedMem.newEDate = endDateEntry.text
 
