@@ -71,7 +71,7 @@ function sceneSelect:create( event )
   local LEFT_PADDING = 10
 
   --Set the background to white
-  display.setDefault( "background", 0.5, 0.13, 0.7 )
+  display.setDefault( "background", 0 )
 
   --Create a group to hold our widgets & images
   local widgetGroup = display.newGroup()
@@ -209,6 +209,8 @@ function sceneSelect:create( event )
         )
       end
 
+      print("Exiting SiteTemplateSelection and dumping sharedMem:")
+      print(dump(sharedMem))
       composer.gotoScene("RenderTemplate")
 
   	end

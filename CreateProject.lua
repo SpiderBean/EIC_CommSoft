@@ -11,6 +11,8 @@ local createProject = composer.newScene()
 function createProject:create( event )
   local sceneGroup = self.view
 
+  --display.setDefault('background', 0)
+
   -- Open the database to load fields
   local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
   local db = sqlite3.open(fPath)
@@ -23,6 +25,7 @@ function createProject:create( event )
     font = nil,
     fontSize = 40,
   }
+  pageTitle:setFillColor(0)
   sceneGroup:insert(pageTitle)
 
   --Create the labels for each of the text entry fields
@@ -32,6 +35,7 @@ function createProject:create( event )
     y = display.contentHeight*0.3,
     align = "right"
   }
+  nameLabel:setFillColor(0)
   sceneGroup:insert(nameLabel)
 
   local startLabel = display.newText {
@@ -40,6 +44,7 @@ function createProject:create( event )
     y = display.contentHeight*0.4,
     align = "right"
   }
+  startLabel:setFillColor(0)
   sceneGroup:insert(startLabel)
 
   local endLabel = display.newText {
@@ -48,6 +53,7 @@ function createProject:create( event )
     y = display.contentHeight*0.5,
     align = "right"
   }
+endLabel:setFillColor(0)
   sceneGroup:insert(endLabel)
 
   --Create the text entry fields
@@ -62,31 +68,40 @@ function createProject:create( event )
   local projNameEntry = RGEasyTextField.create( group, display.contentCenterX, display.contentHeight*0.3,
   	display.contentWidth/4, 30,
   	{
-  		placeholder = "<name>",
-  		fill = {1,1,1}, selStroke = { 1, 0 , 1 }, selStrokeWidth = 4,
-  		fontColor = {1, 0, 1}, fontSize = 10,
+  		placeholder = "Enter text here",
+  		fill = {1,1,1}, selStroke = { 0, 0 , 1 }, selStrokeWidth = 4,
+  		fontColor = {0, 0, 1}, fontSize = 10,
   		listener = myListener
   	} )
+  local textR1 = display.newRect(projNameEntry.x, projNameEntry.y, projNameEntry.width+3, projNameEntry.height+3)
+  textR1:setFillColor(0)
+  sceneGroup:insert(textR1)
 
-    local startDateEntry = RGEasyTextField.create( group, display.contentCenterX, display.contentHeight*0.4,
-    	display.contentWidth/4, 30,
-    	{
-    		placeholder = "<name>",
-    		fill = {1,1,1}, selStroke = { 1, 0 , 1 }, selStrokeWidth = 4,
-    		fontColor = {1, 0, 1}, fontSize = 10,
-    		listener = myListener
-    	} )
+  local startDateEntry = RGEasyTextField.create( group, display.contentCenterX, display.contentHeight*0.4,
+  	display.contentWidth/4, 30,
+  	{
+  		placeholder = "Enter text here",
+  		fill = {1,1,1}, selStroke = { 0, 0 , 1 }, selStrokeWidth = 4,
+  		fontColor = {0, 0, 1}, fontSize = 10,
+  		listener = myListener
+  	} )
+  local textR2 = display.newRect(startDateEntry.x, startDateEntry.y, startDateEntry.width+3, startDateEntry.height+3)
+  textR2:setFillColor(0)
+  sceneGroup:insert(textR2)
 
-      local endDateEntry = RGEasyTextField.create( group, display.contentCenterX, display.contentHeight*0.5,
-      	display.contentWidth/4, 30,
-      	{
-      		placeholder = "<name>",
-      		fill = {1,1,1}, selStroke = { 1, 0 , 1 }, selStrokeWidth = 4,
-      		fontColor = {1, 0, 1}, fontSize = 10,
-      		listener = myListener
-      	} )
+  local endDateEntry = RGEasyTextField.create( group, display.contentCenterX, display.contentHeight*0.5,
+  	display.contentWidth/4, 30,
+  	{
+  		placeholder = "Enter text here",
+  		fill = {1,1,1}, selStroke = { 0, 0 , 1 }, selStrokeWidth = 4,
+  		fontColor = {0, 0, 1}, fontSize = 10,
+  		listener = myListener
+  	} )
+  local textR3 = display.newRect(endDateEntry.x, endDateEntry.y, endDateEntry.width+3, endDateEntry.height+3)
+  textR3:setFillColor(0)
+  sceneGroup:insert(textR3)
 
-        sceneGroup:insert(group)
+  sceneGroup:insert(group)
 
   --local nameEntry = native.newTextField(30, display.contentWidth/4)
   --[[
@@ -115,6 +130,7 @@ function createProject:create( event )
   ]]
 
   local buttonRect1 = display.newRoundedRect(display.contentCenterX, display.contentHeight*0.7, 400,100, 12)
+  buttonRect1:setFillColor(0.4, 0.9, 0.8)
 
   local templateButton = widget.newButton( {
     label="Select an Existing Template",
@@ -124,6 +140,7 @@ function createProject:create( event )
     x = display.contentCenterX,
     y = display.contentHeight*0.7
   } )
+  templateButton:setFillColor(0.4, 0.9, 0.8)
 
   sceneGroup:insert(buttonRect1)
   sceneGroup:insert(templateButton)
@@ -161,6 +178,8 @@ function createProject:create( event )
       sharedMem.newSDate = startDateEntry.text
       sharedMem.newEDate = endDateEntry.text
 
+      print("Exiting CreateProject and dumping sharedMem:")
+      print(dump(sharedMem))
       composer.gotoScene( "SiteTemplateSelection_full_list" )
     end
 

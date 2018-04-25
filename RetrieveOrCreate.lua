@@ -6,6 +6,9 @@ local composer = require "composer"
 -- Create handle for the scene content
 local retrieveOrCreate = composer.newScene()
 
+--Set the background to white
+display.setDefault( "background", 1 )
+
 -- Define the scene create function which fully defines the screen
 function retrieveOrCreate:create( event )
 	local sceneGroup = self.view
@@ -16,7 +19,9 @@ function retrieveOrCreate:create( event )
 
 	-- Generate images to frame the buttons
 	local buttonRect1 = display.newRoundedRect(display.contentCenterX, oneThirdDown,400,100,12)
+	buttonRect1:setFillColor(0.4, 0.9, 0.8)
 	local buttonRect2 = display.newRoundedRect(display.contentCenterX, twoThirdDown,400,100,12)
+	buttonRect2:setFillColor(0.4, 0.9, 0.8)
 
 	sceneGroup:insert(buttonRect1)
 	sceneGroup:insert(buttonRect2)
@@ -28,6 +33,7 @@ function retrieveOrCreate:create( event )
 		height=buttonRect1.height,
 		shape = "buttonRect1"
 	} )
+	retrieveButton:setFillColor(0.4, 0.9, 0.8)
 
 	local createButton = widget.newButton( {
 		label="Create New Project",
@@ -35,6 +41,7 @@ function retrieveOrCreate:create( event )
 		height=buttonRect2.height,
 		shape = "buttonRect2"
 	} )
+	createButton:setFillColor(0.4, 0.9, 0.8)
 
 	sceneGroup:insert( retrieveButton )
 	sceneGroup:insert( createButton )

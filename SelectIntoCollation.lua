@@ -38,6 +38,7 @@ function selectScene:create( event )
   local phase = event.phase
   local parent = event.parent
 
+  -- Open the database to load fields
   local fPath = system.pathForFile( "SoftPlan_001.db", system.DocumentsDirectory )
   local db = sqlite3.open(fPath)
 

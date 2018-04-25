@@ -44,6 +44,8 @@ function renderTemplate:create( event )
   --Create a view to contain item rows for the checklist
   local tableView
 
+  display.setDefault( "background", 1)
+
   ----------------------General Use Functions-----------------------
   ------------------------------------------------------------------
   -- Function for setting status colour
@@ -418,6 +420,7 @@ function renderTemplate:create( event )
 
   local function onSaveExit( event )
     if (event.phase == "ended") then
+      composer.removeScene("RenderTemplate")
       composer.gotoScene("StartScreen")
       writeProgress()
       sharedMem.newProject = false
@@ -532,7 +535,7 @@ function renderTemplate:create( event )
   progPageButton.rotation = 90
 
   local progPageText = display.newText{
-    text = 'Progress',
+    text = 'Progress\nReview',
     x = progPageBox.x,
     y = progPageBox.y + progPageButton.height*0.8,
     width = tabMargin,
@@ -556,7 +559,7 @@ function renderTemplate:create( event )
   docPageBox:setFillColor(0.9)
 
   local docPageText = display.newText{
-    text = 'Documents',
+    text = 'Documents\nReview',
     x = docPageBox.x,
     y = docPageButton.y + docPageButton.height,
     width = tabMargin,
@@ -573,6 +576,7 @@ function renderTemplate:create( event )
       sharedMem.loadProject = false
       composer.removeScene("RenderTemplate")
       composer.gotoScene("RenderTemplate")
+      print(dump(sharedMem))
     end
   end
 
@@ -584,6 +588,7 @@ function renderTemplate:create( event )
       sharedMem.loadProject = false
       composer.removeScene("RenderTemplate")
       composer.gotoScene("RenderTemplate")
+      print(dump(sharedMem))
     end
   end
 

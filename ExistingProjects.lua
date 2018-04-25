@@ -140,6 +140,9 @@ function existingProjects:create( event )
         sharedMem.newSDate = row.params.SDate
         sharedMem.newEDate = row.params.EDate
 
+        print("Exiting ExistingProjects and dumping sharedMem:")
+        print(dump(sharedMem))
+
         composer.removeScene("ExistingProjects")
         composer.gotoScene("RenderTemplate")
       end
