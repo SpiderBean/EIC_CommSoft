@@ -139,6 +139,7 @@ function existingProjects:create( event )
         sharedMem.tempID = row.params.ProjType
         sharedMem.newSDate = row.params.SDate
         sharedMem.newEDate = row.params.EDate
+        sharedMem.isLocked = true
 
         print("Exiting ExistingProjects and dumping sharedMem:")
         print(dump(sharedMem))

@@ -75,7 +75,7 @@ function scene:create( event )
 
 	-- Initialise event listeners for template buttons:
 	local function onSiteTemplate()
-		composer.gotoScene( "RetrieveOrCreate" ) --SiteTemplateSelection_full_list
+		composer.gotoScene( "RetrieveOrCreate" )  
 	end
 
 	local function onCollationTemplate()

@@ -41,7 +41,12 @@ function commentScene:create( event )
   sceneGroup:insert(titleBar)
   sceneGroup:insert(titleText)
 
-  local buttonBar = display.newRect(display.contentCenterX, 0, envelopeBox.width-10, 70)
+  local commentField = native.newTextBox(display.contentCenterX+1, display.contentCenterY-12, envelopeBox.width-10, 475)
+  commentField.isEditable = true
+  commentField.size = 18
+  sceneGroup:insert(commentField)
+
+  local buttonBar = display.newRect(display.contentCenterX, 0, envelopeBox.width-10, 80)
   buttonBar.y = envelopeBox.height*1.05 -- (0.5*titleBar.height)
   buttonBar:setFillColor(1)
 
@@ -54,7 +59,7 @@ function commentScene:create( event )
   --returnRect:setFillColor(0.5)
 
   local returnButton = display.newText( {
-    text="Return",
+    text="Save and Return",
     width=returnRect.width,
     height=30,
     align='center'

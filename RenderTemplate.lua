@@ -49,15 +49,15 @@ function renderTemplate:create( event )
   ----------------------General Use Functions-----------------------
   ------------------------------------------------------------------
   -- Function for setting status colour
-  local function setStatusColour( index, object )
-    if (ProgressTable[index][sharedMem.outputDate] == 0) then
-      object:setFillColor(0.8)
-    elseif (ProgressTable[index][sharedMem.outputDate] == 1) then
+  local function setStatusColour( index, object, date )
+    if (ProgressTable[index][date] == 1) then
       object:setFillColor(1,0,0)
-    elseif (ProgressTable[index][sharedMem.outputDate] == 2) then
+    elseif (ProgressTable[index][date] == 2) then
       object:setFillColor(255/256,189/256,0/256)
-    else
+    elseif (ProgressTable[index][date] == 3) then
       object:setFillColor(0,1,0)
+    else
+      object:setFillColor(0.8)
     end
   end
 
@@ -83,29 +83,29 @@ function renderTemplate:create( event )
       ProgressTable[topLevel][sharedMem.outputDate] = ProgressTable[currentItem][sharedMem.outputDate]
     else
       --Scan entire ProgressTable and check the value of items belonging to the topLevel number
-      --Assume currentItem is governing the floor value - set changeHead to false
-      --if another item disproves this
+      --Assume currentItem is governing the floor value - set changeHead to false if another item disproves this
 
       --print("Made it into the scanning section")
       print("The new status is", ProgressTable[currentItem][sharedMem.outputDate])
       local changeHead = true
+      local wrapAround = false
       for name, val in pairs(ProgressTable) do
         local parentNum = string.match(name, "^(%d*)%.")
         parentNum = tonumber( parentNum )
         --print("ParentNum is", parentNum, "and the topLevel is", topLevel)
+
         if (parentNum == topLevel) then
-          --print("Found a matching item")
-          --print("The name is", name, "and the value is", val)
-          print("Arg 1 is:", ProgressTable[currentItem][sharedMem.outputDate] )
-          print("Arg 2 is:", ProgressTable[currentItem][sharedMem.outputDate] )
           if (((val[sharedMem.outputDate] > 0) and (val[sharedMem.outputDate] < ProgressTable[currentItem][sharedMem.outputDate])) or (ProgressTable[currentItem][sharedMem.outputDate] == 0)) then
             --print("Turns out the current item isn't the floor")
             changeHead = false
           end
+          if (ProgressTable[topLevel][sharedMem.outputDate] == 3 and ProgressTable[currentItem][sharedMem.outputDate] == 0) then
+            wrapAround = true
+          end
         end
       end
       print("Finished scanning")
-      if (changeHead) then
+      if (changeHead or wrapAround) then
         print("We're changing the head value")
         ProgressTable[topLevel][sharedMem.outputDate] = ProgressTable[currentItem][sharedMem.outputDate]
         isHeadChange = true
@@ -174,22 +174,39 @@ function renderTemplate:create( event )
     row.status.y = rowHeight * 0.5
     row.status.height = 40
     row.status.width = 40
-    setStatusColour(row.params.IteNum, row.status)
+    setStatusColour(row.params.IteNum, row.status, sharedMem.outputDate)
+
+    row:insert( row.status )
+
+    row.prevMonth = display.newImage(row,'white_circle.png')
+    row.prevMonth.x = display.contentWidth*0.82
+    row.prevMonth.y = rowHeight * 0.5
+    row.prevMonth.height = 30
+    row.prevMonth.width = 30
+
+    local prevDate
+    local newDate = 0
+    for k, v in pairs(sharedMem.dateArray) do
+      if (sharedMem.outputDate == v) then prevDate = newDate end
+      newDate = v
+    end
+    setStatusColour(row.params.IteNum, row.prevMonth, prevDate)
 
     row:insert( row.status )
 
     --Create a function to modify progress data
     function row:touch( event )
-      if (event.phase == "ended") then
-        ProgressTable[row.params.IteNum][sharedMem.outputDate] = ProgressTable[row.params.IteNum][sharedMem.outputDate] + 1
-        if (ProgressTable[row.params.IteNum][sharedMem.outputDate] > 3) then
-          ProgressTable[row.params.IteNum][sharedMem.outputDate] = 0
+      if not (sharedMem.isLocked) then --This if statement adds locking to the controls
+        if (event.phase == "ended") then
+          ProgressTable[row.params.IteNum][sharedMem.outputDate] = ProgressTable[row.params.IteNum][sharedMem.outputDate] + 1
+          if (ProgressTable[row.params.IteNum][sharedMem.outputDate] > 3) then
+            ProgressTable[row.params.IteNum][sharedMem.outputDate] = 0
+          end
+          setStatusColour(row.params.IteNum, row.status)
+          updateHeading(row.params.IteNum)
         end
-        setStatusColour(row.params.IteNum, row.status)
-        updateHeading(row.params.IteNum)
+        tableView:reloadData()
       end
-      tableView:reloadData()
-
     end
 
     --If a row is a heading, don't assign a button, but make sure a reference
@@ -283,50 +300,6 @@ function renderTemplate:create( event )
     end
   end
 
-  --Declare a lookup table to assist with date generation
-  --[[local months = {
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-  }]]
-
-  --Function to generate array of months between project start and end dates
-  --[[local function dateToDate( startDate, endDate )
-    local dateArray = {}
-
-    local sYear, sMonth, sDay = string.match(startDate, "(%d%d%d%d)%-(%d%d)%-(%d%d)")
-    sYear = tonumber( sYear )
-    sMonth = tonumber( sMonth )
-    sDay = tonumber( sDay )
-
-    local eYear, eMonth, eDay = string.match(endDate, "(%d%d%d%d)%-(%d%d)%-(%d%d)")
-    eYear = tonumber( eYear )
-    eMonth = tonumber( eMonth )
-    eDay = tonumber( eDay )
-
-    --This loop must still execute once when sYear and eYear are equal
-    for i = sYear, eYear, 1 do
-      if (i == sYear) then
-        sM = sMonth
-      else
-        sM = 1
-      end
-
-      if (i == eYear) then
-        eM = eMonth
-      else
-        eM = 12
-      end
-
-      print("The loop limits are:", sM, eM )
-      for j = sM, eM, 1 do
-        year = tostring(i)
-        local monthName = months[j] .. "-" .. string.match(year,"^%d%d(%d%d)")
-        dateArray[#dateArray+1] = monthName
-      end
-    end
-
-    return dateArray
-  end]]
-
 
   --Declare database queries for new and existing projects separately
   local newProjQuery = "SELECT ItemNumber, ItemDescription\
@@ -392,6 +365,7 @@ function renderTemplate:create( event )
     x = display.actualContentWidth*0.875,
     y = display.contentHeight*0.95,
   } )
+  saveButton:setFillColor( 0 )
 
   local function onSave( event )
     sharedMem.newProject = false
@@ -415,7 +389,6 @@ function renderTemplate:create( event )
     y = display.contentHeight*0.85,
     align = "center"
   } )
-
   saveExitButton:setFillColor( 0 )
 
   local function onSaveExit( event )
@@ -495,28 +468,49 @@ function renderTemplate:create( event )
   sceneGroup:insert(dateIncButton)
   sceneGroup:insert(dateDisplay)
 
+  local lockOpen = display.newImage('lock_open.png')
+  lockOpen.x = 57
+  lockOpen.y = titleBar.height/2
+  lockOpen.width = 44
+  lockOpen.height = 44
+  lockOpen.isVisible = false
 
-  -- Function to handle button events
-  local function handleTabBarEvent( event )
-    if (event.phase == 'ended') then
-      onSave(event)
-      print( event.target.id )  -- Reference to button's 'id' parameter
-      if (event.target.id == 'progTab') then
-        print("Changing shared memory to Progress")
-        sharedMem.tempType = 'Progress'
-      elseif (event.target.id == 'docTab') then
-        print("Changing shared memory to Document")
-        sharedMem.tempType = 'Document'
+  local lockClosed = display.newImage('lock_closed.jpg')
+  lockClosed.x = 50
+  lockClosed.y = titleBar.height/2
+  lockClosed.width = 40
+  lockClosed.height = 40
+
+  sceneGroup:insert(lockOpen)
+  sceneGroup:insert(lockClosed)
+
+  --Set the visibility of the lock images just created
+  --if (sharedMem.isLocked) then
+  --  lockOpen.visible = false
+  --  lockClosed.visible = true
+  --else
+  --  lockOpen.visible = true
+  --  lockClosed.visible = false
+  --end
+
+  local function onLock( event )
+    if (event.phase == "ended") then
+      if (sharedMem.isLocked) then
+        sharedMem.isLocked = false
+        lockOpen.isVisible = true
+        lockClosed.isVisible = false
+        print("-------Unlocked---------")
       else
-        print("Invalid tab and revision options")
+        sharedMem.isLocked = true
+        lockOpen.isVisible = false
+        lockClosed.isVisible = true
+        print("-------Locked---------")
       end
-
-      print("The new value for tempType is", sharedMem.tempType)
-
-      composer.removeScene("RenderTemplate")
-      composer.gotoScene("RenderTemplate")
     end
   end
+
+  lockOpen:addEventListener('touch', onLock)
+  lockClosed:addEventListener('touch', onLock)
 
   -- Configure the tab buttons to appear within the bar
   local tabMargin = (display.actualContentWidth - display.contentWidth)/2
@@ -576,7 +570,7 @@ function renderTemplate:create( event )
       sharedMem.loadProject = false
       composer.removeScene("RenderTemplate")
       composer.gotoScene("RenderTemplate")
-      print(dump(sharedMem))
+      sharedMem.isLocked = true
     end
   end
 
@@ -588,7 +582,7 @@ function renderTemplate:create( event )
       sharedMem.loadProject = false
       composer.removeScene("RenderTemplate")
       composer.gotoScene("RenderTemplate")
-      print(dump(sharedMem))
+      sharedMem.isLocked = true
     end
   end
 

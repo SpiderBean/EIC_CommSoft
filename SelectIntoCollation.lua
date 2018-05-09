@@ -302,7 +302,8 @@ function processItem( event, row )
           Type = row.params.ProjType,
           isAdd = false,
           dateArray = dArr,
-          date = dArr[1],
+          date = dArr[#dArr],
+          dateSubset = { dArr[#dArr] },
           dataTable = nil,
           index = PrTlength + 1, --This should be overwritten by the counting function
         }

@@ -180,7 +180,7 @@ endLabel:setFillColor(0)
 
       print("Exiting CreateProject and dumping sharedMem:")
       print(dump(sharedMem))
-      composer.gotoScene( "SiteTemplateSelection_full_list" )
+      composer.gotoScene( "TemplatesList" )
     end
 
   end
